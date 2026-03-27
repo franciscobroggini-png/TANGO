@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TANGO MM Dinámico — VCP Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════ TOP BAR ═══════════════ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="logo">TANGO</span>
+    <span class="fund-badge">MM DINÁMICO</span>
+    <div class="fecha-display" title="Fecha de hoy (operativa)">
+      📅 <input type="date" id="fechaHoy" onchange="cambiarFecha()">
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="showPage('resumen')">Resumen</div>
+    <div class="nav-tab" onclick="showPage('cartera')">Cartera</div>
+    <div class="nav-tab" onclick="showPage('blotter')">Blotter</div>
+    <div class="nav-tab" onclick="showPage('limites')">Límites</div>
+    <div class="nav-tab" onclick="showPage('caja')">Caja</div>
+    <div class="nav-tab" onclick="showPage('historial')">Historial</div>
+    <div class="nav-tab" onclick="showPage('reinicio')">⚡ Reinicio</div>
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<div class="main">
+
+  <!-- RESUMEN -->
+  <div id="page-resumen" class="page active">
+    <div class="vcp-grid" id="vcpGrid"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Patrimonio Neto</span></div>
+        <div class="card-body" id="pnPanel"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Honorarios del Día</span></div>
+        <div class="card-body" id="honorariosPanel"></div>
+      </div>
+    </div>
+    <div class="section-gap"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Suscripciones / Rescates</span>
+          <button class="btn btn-primary btn-sm" onclick="openModal('modalSR')">+ Nuevo</button>
+        </div>
+        <div class="card-body" id="srPanel"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Alerta de Límites</span></div>
+        <div class="card-body" id="alertasPanel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CARTERA -->
+  <div id="page-cartera" class="page">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span class="card-title">Cartera del Día — <span id="cartFechaLabel"></span></span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="openModal('modalPrecio')">📋 Cargar Precios</button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('modalNuevoActivo')">+ Activo</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table id="cartTable">
+          <thead>
+            <tr>
+              <th>Especie</th><th>Asset Class</th><th>Moneda</th>
+              <th>Cantidad</th><th>PPP</th><th>Px Cierre</th>
+              <th>Monto MKT</th><th>P&L Día</th><th>Devengado</th><th>Vto.</th>
+            </tr>
+          </thead>
+          <tbody id="cartBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLOTTER -->
+  <div id="page-blotter" class="page">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Blotter de Operaciones — <span id="blotterFechaLabel"></span></span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-danger btn-sm" onclick="limpiarBlotter()">🗑 Limpiar Todo</button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('modalOp')">+ Operación</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table id="blotterTable">
+          <thead>
+            <tr>
+              <th>Op.</th><th>Especie</th><th>Moneda</th><th>Plazo</th>
+              <th>Cantidad</th><th>Precio</th><th>Monto</th>
+              <th>Contraparte</th><th>Mercado</th><th>Conc.</th><th>Liq.</th><th>Vto.</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="blotterBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÍMITES -->
+  <div id="page-limites" class="page">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Control Normativo — CNV / Política de Inversión</span>
+        <span id="limitesUpdate" style="font-family:var(--mono);font-size:10px;color:var(--text3)"></span>
+      </div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:160px 1fr 90px 90px 80px;gap:12px;padding:0 0 8px;border-bottom:1px solid var(--border);margin-bottom:4px">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Límite</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Exposición</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;text-align:right">Actual</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;text-align:right">Límite</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;text-align:right">Estado</span>
+        </div>
+        <div id="limitesBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAJA -->
+  <div id="page-caja" class="page">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Flujo de Caja del Día</span></div>
+        <div class="card-body" id="cajaPanel"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Vencimientos Próximos</span></div>
+        <div class="card-body" id="vencimientosPanel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="page-historial" class="page">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Historial de VCP — Clase A</span>
+        <button class="btn btn-secondary btn-sm" onclick="exportarHistorial()">⬇ Exportar CSV</button>
+      </div>
+      <div class="card-body" id="historialPanel"></div>
+    </div>
+  </div>
+
+  <!-- REINICIO -->
+  <div id="page-reinicio" class="page">
+    <div class="grid-2">
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header"><span class="card-title">⚡ Reinicio Diario</span></div>
+          <div class="card-body">
+            <p style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:16px;line-height:1.6">
+              Ejecutá el reinicio para preparar el dashboard para el nuevo día operativo.
+            </p>
+            <div class="reinicio-btn" onclick="reinicioFecha()">
+              <span class="reinicio-btn-icon">📅</span>
+              <div class="reinicio-btn-text">
+                <div class="reinicio-btn-title">1. Avanzar Fecha</div>
+                <div class="reinicio-btn-sub">Mueve Fecha Cartera → Fecha Hoy, calcula T+1</div>
+              </div>
+            </div>
+            <div class="reinicio-btn" onclick="limpiarBlotter()">
+              <span class="reinicio-btn-icon">🗑</span>
+              <div class="reinicio-btn-text">
+                <div class="reinicio-btn-title">2. Limpiar Blotter</div>
+                <div class="reinicio-btn-sub">Archiva operaciones del día anterior</div>
+              </div>
+            </div>
+            <div class="reinicio-btn" onclick="openModal('modalPrecio')">
+              <span class="reinicio-btn-icon">📋</span>
+              <div class="reinicio-btn-text">
+                <div class="reinicio-btn-title">3. Cargar Precios de Cierre</div>
+                <div class="reinicio-btn-sub">Pegá la tabla de cierres del día</div>
+              </div>
+            </div>
+            <div class="reinicio-btn" onclick="calcularVCP()">
+              <span class="reinicio-btn-icon">⚙️</span>
+              <div class="reinicio-btn-text">
+                <div class="reinicio-btn-title">4. Recalcular VCP</div>
+                <div class="reinicio-btn-sub">Actualiza patrimonio, VCP y límites</div>
+              </div>
+            </div>
+            <hr class="divider">
+            <button class="btn btn-primary" style="width:100%" onclick="reinicioCompleto()">
+              ▶ Ejecutar Reinicio Completo (1→4)
+            </button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header"><span class="card-title">Estado Actual</span></div>
+          <div class="card-body" id="reinicioEstado"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Tipo de Cambio</span></div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <span class="form-label">CCL</span>
+                <input type="number" id="inputCCL" style="width:120px" placeholder="1488">
+              </div>
+              <div class="form-group">
+                <span class="form-label">MEP</span>
+                <input type="number" id="inputMEP" style="width:120px" placeholder="1453">
+              </div>
+              <button class="btn btn-primary" onclick="guardarFX()">Guardar</button>
+            </div>
+            <div id="fxStatus" style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end .main -->
+
+<!-- ═══════════════ MODALS ═══════════════ -->
+
+<!-- Modal: Suscripción/Rescate -->
+<div class="modal-overlay" id="modalSR">
+  <div class="modal">
+    <div class="modal-title">+ Suscripción / Rescate</div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Tipo</span>
+        <select id="srTipo" style="width:140px">
+          <option value="suscripcion">Suscripción</option>
+          <option value="rescate">Rescate</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Clase</span>
+        <select id="srClase" style="width:100px">
+          <option>A</option><option>B</option><option>C</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Cuotapartes</span>
+        <input type="number" id="srCuotas" placeholder="0" style="width:160px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Monto ARS</span>
+        <input type="number" id="srMonto" placeholder="0" style="width:180px">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <span class="form-label">Comitente / Notas</span>
+      <input type="text" id="srNota" placeholder="Nombre o descripción" style="width:100%">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalSR')">Cancelar</button>
+      <button class="btn btn-primary" onclick="agregarSR()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nueva Operación Blotter -->
+<div class="modal-overlay" id="modalOp">
+  <div class="modal">
+    <div class="modal-title">+ Nueva Operación</div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Operación</span>
+        <select id="opTipo" style="width:120px">
+          <option>COMPRA</option><option>VENTA</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Especie</span>
+        <input type="text" id="opEspecie" placeholder="GD30D" style="width:120px;text-transform:uppercase">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Moneda</span>
+        <select id="opMoneda" style="width:100px">
+          <option>ARS</option><option>MEP</option><option>CABLE</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Plazo</span>
+        <select id="opPlazo" style="width:80px">
+          <option>CI</option><option>24hs</option><option>48hs</option><option>72hs</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Cantidad</span>
+        <input type="number" id="opCantidad" placeholder="0" style="width:130px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Precio</span>
+        <input type="number" id="opPrecio" placeholder="0.00" step="0.0001" style="width:130px" oninput="calcularMontoOp()">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Monto</span>
+        <input type="number" id="opMonto" placeholder="0" style="width:150px;color:var(--accent)">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Contraparte</span>
+        <input type="text" id="opContraparte" placeholder="Nombre" style="width:200px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Mercado</span>
+        <select id="opMercado" style="width:120px">
+          <option>BYMA</option><option>SENEBI</option><option>ROFEX</option><option>OTC</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Concertación</span>
+        <input type="date" id="opConc" style="width:150px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Liquidación</span>
+        <input type="date" id="opLiq" style="width:150px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Vencimiento</span>
+        <input type="date" id="opVto" style="width:150px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalOp')">Cancelar</button>
+      <button class="btn btn-primary" onclick="agregarOp()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cargar Precios -->
+<div class="modal-overlay" id="modalPrecio">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">📋 Cargar Precios de Cierre</div>
+    <p style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:12px;line-height:1.6">
+      Pegá el contenido de tu Excel de cierres. Formato: una especie por línea separada por tab o coma.<br>
+      Ej: <span style="color:var(--accent)">GD30D&nbsp;&nbsp;&nbsp;549.00</span>
+    </p>
+    <textarea id="precioInput" style="width:100%;height:180px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;border-radius:4px;padding:10px;resize:vertical;outline:none" placeholder="Pegá aquí los cierres...
+GD30D	549.00
+AL30D	560.00
+..."></textarea>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalPrecio')">Cancelar</button>
+      <button class="btn btn-primary" onclick="cargarPrecios()">Aplicar Precios</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nuevo Activo en Cartera -->
+<div class="modal-overlay" id="modalNuevoActivo">
+  <div class="modal">
+    <div class="modal-title">+ Agregar Activo a la Cartera</div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Especie</span>
+        <input type="text" id="naEspecie" style="width:160px;text-transform:uppercase" placeholder="PF_GGAL_080526">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Asset Class</span>
+        <select id="naAsset" style="width:140px">
+          <option value="LECAP">LECAP</option>
+          <option value="PF">Plazo Fijo</option>
+          <option value="CAUCION">Caución</option>
+          <option value="PASE">Pase</option>
+          <option value="REMU">Remunerada</option>
+          <option value="FCI">FCI</option>
+          <option value="SOB_HD">Soberano HD</option>
+          <option value="EQUITY">Equity</option>
+          <option value="CORPO_HD">Corpo HD</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Moneda</span>
+        <select id="naMoneda" style="width:100px">
+          <option>ARS</option><option>MEP</option><option>CABLE</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Cantidad / Monto</span>
+        <input type="number" id="naCantidad" placeholder="0" style="width:160px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">PPP</span>
+        <input type="number" id="naPPP" placeholder="1" step="0.0001" style="width:110px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Px Cierre</span>
+        <input type="number" id="naPx" placeholder="1" step="0.0001" style="width:110px">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <span class="form-label">Tasa anual (%)</span>
+        <input type="number" id="naTasa" placeholder="ej: 26.75" step="0.01" style="width:140px">
+      </div>
+      <div class="form-group">
+        <span class="form-label">Vencimiento</span>
+        <input type="date" id="naVto" style="width:160px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalNuevoActivo')">Cancelar</button>
+      <button class="btn btn-primary" onclick="agregarActivo()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="src/app.js"></script>
+</body>
+</html>
