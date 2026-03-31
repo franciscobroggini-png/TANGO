@@ -153,8 +153,18 @@ const STATE = {
 // ══════════════════════════════════════════════
 //  INIT  —  fija UI al estado del Día 1
 // ══════════════════════════════════════════════
-function init() {
+async function init() {
+  // Mostrar pantalla de carga
   document.getElementById('fechaHoy').value = STATE.fechaHoy;
+
+  // Intentar cargar desde Supabase (si falla, la app sigue en modo offline)
+  const online = await db_inicializar();
+  if (online) {
+    console.log('Modo: online (Supabase)');
+  } else {
+    console.log('Modo: offline (datos locales del Día 1)');
+  }
+
   calcularVCP();
   renderAll();
 }
@@ -983,6 +993,8 @@ function agregarSR() {
   closeModal('modalSR');
   calcularVCP(); renderAll();
   toast(`${tipo === 'suscripcion' ? 'Suscripción' : 'Rescate'} registrado: $${fmtNum(montoFinal)}`);
+  // Guardar en base de datos (no bloquea la UI)
+  db_guardarSR({ tipo, clase, cuotas, monto: montoFinal, nota }).catch(e => console.warn('SR no guardado:', e));
 }
 
 function agregarOp() {
@@ -1010,6 +1022,10 @@ function agregarOp() {
   renderBlotter(); renderCaja();
   setTimeout(() => { op._new = false; renderBlotter(); }, 600);
   toast(`${op.tipo} ${op.especie} registrada`);
+  // Guardar en Supabase y guardar el id de DB en el objeto
+  db_guardarOperacion(op).then(rows => {
+    if (rows && rows[0]) op._dbId = rows[0].id;
+  }).catch(e => console.warn('Op no guardada:', e));
 }
 
 function calcularMontoOp() {
@@ -1024,6 +1040,8 @@ function eliminarOp(i) {
   STATE.blotter.splice(i, 1);
   renderBlotter(); renderCaja();
   toast('Operación eliminada');
+  // Eliminar de Supabase si tiene id de base
+  if (op._dbId) db_eliminarOperacion(op._dbId).catch(e => console.warn('No se eliminó de DB:', e));
 }
 
 function limpiarBlotter() {
@@ -1104,18 +1122,33 @@ function reinicioFecha() {
   toast(`Fecha avanzada a ${fmtDate(STATE.fechaHoy)} ✓`, 'success');
 }
 
-function reinicioCompleto() {
-  // Guardar en historial antes de limpiar
+async function reinicioCompleto() {
+  // 1. Snapshot del día → Supabase (VCP, cartera, precios, cierra el día)
+  await db_cerrarYGuardar();
+
+  // 2. Guardar en historial local
   const totalPN = Object.values(STATE.clases).reduce((s,c) => s + (c.patrimonioHoy||c.patrimonioAyer), 0);
   STATE.historial.push({
     fecha: STATE.fechaHoy,
-    vcp: STATE.clases.A.vcpHoy || STATE.clases.A.vcpAyer,
-    pn: totalPN,
+    vcp:  STATE.clases.A.vcpHoy || STATE.clases.A.vcpAyer,
+    pn:   totalPN,
     rend: STATE.clases.A.rend || 0,
   });
+
+  // 3. Avanzar fecha y limpiar estado del día
   reinicioFecha();
   STATE.blotter = [];
-  STATE.caja = { inicio: Object.values(STATE.clases).reduce((s,c)=>s+(c.patrimonioHoy||c.patrimonioAyer),0), suscripciones:0, rescates:0, mercado:0, vtoPF:0, concPF:0, vtoChecque:0, concChecque:0, vtoCaucion:0, concCaucion:0, remu:0, gastos:0 };
+  STATE.movimientos = { suscripciones: 0, rescates: 0, srList: [] };
+  STATE.caja = {
+    inicio: totalPN, suscripciones: 0, rescates: 0, mercado: 0,
+    vtoPF: 0, concPF: 0, vtoChecque: 0, concChecque: 0,
+    vtoCaucion: 0, concCaucion: 0, remu: 0, concPase: 0, gastos: 0,
+  };
+
+  // 4. Abrir el nuevo día en Supabase
+  await db_abrirDia(STATE.fechaHoy, STATE.fechaCartera, STATE.fechaT1, STATE.ccl, STATE.mep)
+    .catch(e => console.warn('No se abrió el día en DB:', e));
+
   calcularVCP(); renderAll();
   toast('✅ Reinicio completo ejecutado', 'success');
 }
